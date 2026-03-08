@@ -36,7 +36,7 @@ repos:
     #
     # Similar idea to version pinning in requirements.txt.
     #
-    rev: v0.13.0
+    rev: v0.15.4
 
     # "hooks" selects which hook definitions from that
     # repository we want to use.
@@ -45,6 +45,7 @@ repos:
     #
     hooks:
       - id: ruff
+        args: [--fix]
       - id: ruff-format
 
     # Important:
@@ -61,7 +62,7 @@ repos:
   # Another Remote Hook Provider
   # ==========================================================
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.1
+    rev: v1.19.1
     hooks:
       - id: mypy
 
@@ -120,55 +121,20 @@ repos:
 
         # always_run: true ensures the hook runs on
         # every commit attempt.
-        #
         # Without this, the hook might be skipped if
         # pre-commit believes no relevant files changed.
         #
         always_run: true
 
       - id: license-check-gpl
-
-        # Human-readable name shown in pre-commit output
         name: block copyleft licenses (GPL/AGPL/LGPL) in runtime deps
-
-        # language: system
-        #
-        # This tells pre-commit:
-        # → Do NOT create an isolated virtualenv
-        # → Use the existing Poetry environment
-        #
-        # We need this because pip-licenses must inspect
-        # the current Poetry-installed dependencies.
-        #
         language: system
-
-        # entry:
-        # The exact shell command pre-commit executes.
-        #
-        # We wrap the command in:
-        # bash -c ' ... '
-        #
-        # so we can combine multiple shell operations
-        # (grep + echo + exit logic).
-        #
-        entry: |-
-          bash -c "poetry run pip-licenses | grep -E -i '(^|[^A-Z])(A?G?PL)([^A-Z]|$)' && echo 'ERROR: Copyleft license detected.' && exit 1 || exit 0"
-
-        # pass_filenames: false
-        #
-        # By default, pre-commit passes only changed files
-        # to hooks.
-        #
-        # This hook does NOT operate on files.
-        # It checks the entire dependency environment.
-        #
+        entry: >
+          bash -c '
+            poetry run pip-licenses --format=json |
+            jq -r ".[] | select(.License | test(\"^(GPL|AGPL|LGPL)\"; \"i\"))" |
+            grep . &&
+            echo "ERROR: Copyleft license detected. Remove or replace dependency." &&
+            exit 1 || exit 0'
         pass_filenames: false
-
-        # always_run: true
-        #
-        # Ensures this hook runs on EVERY commit attempt,
-        # even if no Python files changed.
-        #
-        # License risk is environment-wide, not file-specific.
-        #
-        always_run: true      
+        always_run: true
